@@ -1,0 +1,137 @@
+# Tidytuesday Data  - August 2019
+# Data from Stockholm International Peace Research Institute
+# Version 1.0
+# Date: 12.02.2021
+# Björn Düsenberg
+
+# Libraries
+library(tidyverse)
+library(tidymodels)
+library(vip)
+
+# Import Data
+nuclear_explosions <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-08-20/nuclear_explosions.csv")
+
+# write.csv(nuclear_explosions, "nuclear_explosions.csv")
+
+
+# Manipulate Data
+nu_ex_df <- nuclear_explosions %>% 
+  transmute(purpose = case_when(str_detect(purpose, "SE")~"SE", # Safety explosion
+                                str_detect(purpose, "PNE")~"PNE", # Peaceful Nuclear Explosion
+                                str_detect(purpose, "WR")~"WR", # Weapon research
+                                str_detect(purpose, "WE")~"WE", # Weapon evaluation
+                                TRUE ~ "Other"),
+            type = case_when(str_detect(type, "SHAFT")~"SHAFT",
+                             str_detect(type, "TUNNEL")~"TUNNEL",
+                             str_detect(type, "ATMOSPH")~"ATMOSPH",
+                             str_detect(type, "AIRDROP")~"AIRDROP",
+                             str_detect(type, "TOWER")~"TOWER",
+                             str_detect(type, "BALLOON")~"BALLOON",
+                             str_detect(type, "UG")~"UG",
+                             TRUE ~ "Other"),
+            latitude, longitude, depth, region, yield_lower, yield_upper) %>%
+  mutate_if(is.character, factor) %>%
+  na.omit(nu_ex_df)
+
+# Overview - Map
+world <- map_data("world")
+
+nu_ex_map_type <- ggplot() +
+  geom_map(data = world, map = world,
+           aes(long, lat, map_id = region),
+           alpha = 0.5) + 
+  geom_point(data = nu_ex_df, aes(longitude, latitude, color = type),
+             alpha = 0.8, size = 3)
+
+plot(nu_ex_map_type)
+
+# Build a model
+
+# --> Bootstrap resampling
+nu_ex_boot <- bootstraps(nu_ex_df)
+
+# --> Create recipe
+
+type_recipe <- recipe(type ~ ., data = nu_ex_df) %>%
+  step_other(region) %>%
+  step_dummy(region, purpose) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_predictors())
+
+# --> Prepare recipe
+
+type_prep <- prep(type_recipe)
+
+# --> Model
+
+rf_type <- rand_forest(trees = 1000) %>%
+  set_mode("classification") %>%
+  set_engine("ranger")
+
+# --> Workflow 
+
+type_wf <- workflow() %>%
+  add_recipe(type_recipe) %>%
+  add_model(rf_type)
+
+# --> Fit resampling
+
+type_res <- fit_resamples(
+  type_wf,
+  resamples = nu_ex_boot,
+  control = control_resamples(save_pred = T,
+                              verbose = T)
+)
+
+# Explore results
+type_met <- type_res %>%
+  collect_metrics()
+
+type_pred <- type_res %>%
+  collect_predictions() %>%
+  conf_mat(type, .pred_class)
+
+# Model understanding
+
+# --> importance of variables
+rf_importance <- rf_type %>%
+  set_engine("ranger", importance = "permutation") %>%
+               fit(
+                 type ~ .,
+                 data = juice(type_prep)
+               ) %>%
+  vip(geom = "point")
+
+plot(rf_importance)
+
+# --> correct predictions (we know that from accuracy)
+correct_pred <- type_res %>%
+  collect_predictions() %>%
+  mutate(correct = type == .pred_class) %>%
+  left_join(nu_ex_df %>% mutate(.row = row_number()))
+  
+nu_ex_map_predicted <- ggplot() +
+  geom_map(data = world, map = world,
+           aes(long, lat, map_id = region),
+           alpha = 0.5) + 
+  stat_summary_hex(data = correct_pred,
+                   aes(x = longitude, y = latitude, 
+                       z = as.integer(correct)),
+                   fun = "mean",
+                   alpha = 0.7, bins = 70) +
+  scale_fill_gradient(high = "cyan3")
+
+plot(nu_ex_map_predicted)
+  
+
+
+
+
+
+
+
+
+
+
+  
