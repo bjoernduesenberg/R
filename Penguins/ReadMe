@@ -1,1 +1,6 @@
-Introduction to the tidymodels framework
+Introduction to the tidymodels framework.
+
+Classification of the penguinsex with a GLM and a random forest as well as the comparison of these models.
+
+Little project in accordance to Julia Silges (https://github.com/juliasilge) video:
+https://www.youtube.com/watch?v=z57i2GVcdww
