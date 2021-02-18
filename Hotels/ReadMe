@@ -1,1 +1,4 @@
+Prediction of the hotel bookings with and without children with the tidymodels framework.
 
+Little project in accordance to Julia Silges (https://github.com/juliasilge) video:
+https://www.youtube.com/watch?v=dbXDkEEuvCU
