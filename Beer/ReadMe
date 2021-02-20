@@ -1,1 +1,4 @@
+Prediction of the used amount of sugar per amount of malt during the beer production with the tidymodels framework.
 
+Little project in accordance to Julia Silges (https://github.com/juliasilge) video:
+https://www.youtube.com/watch?v=7LGR1sEUXoI&t=856s
