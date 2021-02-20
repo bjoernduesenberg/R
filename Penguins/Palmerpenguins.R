@@ -1,5 +1,5 @@
 # Tidytuesday Data  - July 2020
-# Version 1.2
+# Version 1.3
 # Date: 18.02.2021
 # Björn Düsenberg
 
@@ -14,6 +14,7 @@
 library(tidyverse)
 library(tidymodels)
 library(palmerpenguins)
+library(doParallel)
 
 # Create dataframe from penguins library
 # Is not necessary - We could use "penguins"
@@ -49,7 +50,7 @@ data %>%
 # Delete rows wich have NA in sex
 # Select all columns but year and island
 
-penguinds_df <- data %>%
+penguins_df <- data %>%
   filter(!is.na(sex)) %>%
   select(-year, -island)
 
@@ -58,7 +59,7 @@ set.seed(555)
 
 # Split the data into trainingset and testset
 # strata = sex --> Make sure, that the proportion between M and F is the same
-penguin_split <- initial_split(penguinds_df, strata = sex)
+penguin_split <- initial_split(penguins_df, strata = sex)
 
 train <- training(penguin_split)
 test <- testing(penguin_split)
@@ -90,6 +91,9 @@ penguin_workflow <- workflow() %>%
 # So we dont add the model directly into the workflow
 # We fit the workflow and the model together with the bootstrap resamples
 
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
 glm_rs <- penguin_workflow %>%
   add_model(glm_spec) %>%
   fit_resamples(resamples = penguin_boot,
@@ -99,6 +103,10 @@ rf_rs <- penguin_workflow %>%
   add_model(rf_spec) %>%
   fit_resamples(resamples = penguin_boot,
                 control = control_resamples(save_pred = T, verbose = T))
+
+registerDoSEQ()
+stopCluster(cl)
+
 
 # We put the resamples and a control argument in each fit_resamples function
 
